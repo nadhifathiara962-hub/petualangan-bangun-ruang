@@ -1,0 +1,125 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geometry Challenge</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--b:#4cc3ff;--y:#ffd23f;--g:#43c76b;--o:#ff8a3d;--r:#ff5c7a;--ink:#16324f}
+*{box-sizing:border-box}body{margin:0;font-family:'Baloo 2','Trebuchet MS',sans-serif;color:var(--ink);background:linear-gradient(#bfe9ff,#fff7d6);min-height:100vh}
+#app{max-width:900px;margin:auto;padding:16px;text-align:center}
+.card{background:#fff;border-radius:24px;padding:20px;box-shadow:0 6px 0 #0001;margin:12px 0}
+h1{font-size:clamp(26px,6vw,46px);margin:8px 0}
+button,input{font:inherit;border-radius:18px;border:3px solid #0002;padding:12px 18px;max-width:100%}
+button{cursor:pointer;background:var(--y);font-weight:800;font-size:1.1rem;border-bottom:6px solid #0003}
+button:active{transform:translateY(3px)}button:disabled{opacity:.5}
+.big{font-size:1.4rem;padding:16px 26px;margin:6px}
+.b{background:var(--b)}.g{background:var(--g)}.o{background:var(--o)}.r{background:var(--r);color:#fff}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}.opt{font-size:1.4rem;text-align:left;padding:20px}
+.pin{font-size:4rem;font-weight:800;letter-spacing:8px;color:var(--o)}
+.chip{display:inline-block;background:#fff;border-radius:99px;padding:6px 14px;margin:4px;border:2px solid var(--b)}
+.shapes span{display:inline-block;font-size:3rem;animation:fl 3s ease-in-out infinite}.shapes span:nth-child(2n){animation-delay:.6s}
+@keyframes fl{50%{transform:translateY(-12px) rotate(10deg)}}
+table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #0001}
+.pod{display:flex;align-items:flex-end;justify-content:center;gap:8px;margin:16px 0}.pod div{width:30%;border-radius:16px 16px 0 0;padding:8px;font-weight:800}
+.bar{height:16px;background:var(--b);border-radius:9px;min-width:2px}
+.cf{position:fixed;top:-20px;width:10px;height:14px;z-index:9;animation:fall 3s linear forwards}@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+@media(max-width:560px){.opts{grid-template-columns:1fr}}
+</style></head><body><div id="app"></div>
+<script>
+const SUPABASE_URL="ISI_DENGAN_PROJECT_URL", SUPABASE_KEY="ISI_DENGAN_ANON_PUBLIC_KEY";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=i=>document.getElementById(i), L=['A','B','C','D'];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S,role,me,Q=[],P=[],LB=[],ST=[],ch,t1,t2,lastK='',busy=0,conf;
+const view=h=>{$('app').innerHTML=h};
+async function call(fn,a){const {data,error}=await sb.rpc(fn,a);if(error){alert(error.message);return null}return data}
+const left=()=>S&&S.q_started?Math.max(0,Math.ceil(S.time_limit-(Date.now()-new Date(S.q_started))/1000)):0;
+const ans=()=>localStorage['a'+S.id+'_'+S.current_q]||'';
+const tm=()=>`<b id=tm ${left()==0?'data-z=1':''}>⏱ ${left()}</b>`;
+function stop(){ch&&sb.removeChannel(ch);clearInterval(t1);clearInterval(t2);ch=null}
+
+async function init(){
+  if(SUPABASE_URL.startsWith('ISI'))return view('<div class=card><h2>Isi SUPABASE_URL dan SUPABASE_KEY di index.html</h2></div>');
+  const {data:{session}}=await sb.auth.getSession(),id=localStorage.gcs;
+  if(session&&session.user.is_anonymous&&id){
+    const {data:s}=await sb.from('sessions').select('*').eq('id',id).maybeSingle();
+    if(s&&s.status!='finished'){const {data:p}=await sb.from('players').select('*').eq('session_id',id).eq('id',session.user.id).maybeSingle();
+      if(p){me=p;return enter(s,'student')}}}
+  home();if(new URLSearchParams(location.search).get('pin'))studentJoin()}
+function home(){stop();view(`<div class=card><div class=shapes><span>🧊</span><span>📦</span><span>⚽</span><span>🥫</span><span>🍦</span></div>
+<h1>GEOMETRY CHALLENGE</h1><p>Petualangan Mengenal Bangun Ruang</p><p>Ayo jelajahi dunia bangun ruang, jawab tantangannya, dan jadilah juara!</p>
+<button class="big b" onclick="teacherLogin()">MASUK SEBAGAI GURU</button><button class="big g" onclick="studentJoin()">GABUNG SEBAGAI SISWA</button></div>`)}
+
+/* ---------- GURU ---------- */
+function teacherLogin(){view(`<div class=card><h1>Masuk Guru</h1><p><input id=em type=email placeholder="Email"></p><p><input id=pw type=password placeholder="Kata sandi (min. 6)"></p>
+<button class="big b" onclick="auth(0)">MASUK</button><button class="big o" onclick="auth(1)">DAFTAR</button> <button onclick="home()">Kembali</button></div>`)}
+async function auth(up){const c={email:$('em').value,password:$('pw').value};
+  const r=up?await sb.auth.signUp(c):await sb.auth.signInWithPassword(c);
+  if(r.error)return alert(r.error.message);if(!r.data.session)return alert('Cek email untuk konfirmasi, lalu masuk.');dash()}
+async function dash(){stop();const {data:h}=await sb.from('sessions').select('*').order('created_at',{ascending:false});
+  view(`<div class=card><h1>Dashboard Guru</h1><p>Kuis Akhir: Mengenal Bangun Ruang · 7 soal</p>
+<p><input id=gn value="Geometry Challenge"></p><p>Waktu per soal (detik): <input id=gt type=number value=30 min=5 style="width:90px"> <label><input id=gl type=checkbox> tampilkan leaderboard selama permainan</label></p>
+<button class="big g" onclick="newGame()">BUAT SESI BARU</button> <button onclick="sb.auth.signOut();home()">Keluar</button></div>
+<div class=card><h2>Riwayat Sesi</h2><table>${(h||[]).map(s=>`<tr><td>${esc(s.name)}</td><td>${s.pin}</td><td>${new Date(s.created_at).toLocaleString('id-ID')}</td><td>${s.status}</td><td><button onclick="openS('${s.id}')">Buka</button></td></tr>`).join('')||'<tr><td>Belum ada sesi</td></tr>'}</table></div>`)}
+async function newGame(){const s=await call('create_session',{p_name:$('gn').value,p_time:+$('gt').value,p_lb:$('gl').checked});if(s)enter(s,'host')}
+async function openS(id){const {data:s}=await sb.from('sessions').select('*').eq('id',id).single();enter(s,'host')}
+async function adv(e){const s=await call('advance_session',{p_id:S.id,p_end:!!e});if(s){S=s;lastK='';refresh()}}
+async function kick(id){await sb.from('players').delete().eq('session_id',S.id).eq('id',id);refresh()}
+function hostView(){
+  const link=location.origin+location.pathname+'?pin='+S.pin;
+  if(S.status=='lobby')return view(`<div class=card><h1>${esc(S.name)}</h1><p>Game PIN</p><div class=pin>${S.pin}</div>
+<p><button onclick="navigator.clipboard.writeText('${link}');this.textContent='Tersalin ✓'">Salin tautan siswa</button></p><p><small>${esc(link)}</small></p>
+<h2>Peserta: ${P.length}</h2>${P.map(p=>`<span class=chip>${esc(p.name)} <a href=# onclick="kick('${p.id}');return false">✕</a></span>`).join('')||'<p>Menunggu siswa…</p>'}
+<p><button class="big g" ${P.length?'':'disabled'} onclick="adv()">MULAI KUIS</button> <button onclick="dash()">Dashboard</button></p></div>`);
+  const q=Q[S.current_q-1],n=ST.reduce((a,x)=>a+x.n,0),ok=ST.filter(x=>x.ok).reduce((a,x)=>a+x.n,0),cnt=c=>(ST.find(x=>x.choice==c)||{n:0}).n,pc=n?Math.round(ok/n*100):0;
+  view(`<div class=card><p>Soal ${S.current_q} dari ${Q.length} · ${tm()}</p><h2>${q.pic} ${esc(q.body)}</h2>
+${L.map(c=>`<div style="text-align:left">${c}. ${esc(q[c.toLowerCase()])} — ${cnt(c)}<div class=bar style="width:${n?cnt(c)/n*100:0}%"></div></div>`).join('')}
+<p>Sudah menjawab: ${n}/${P.length} · Benar ${pc}% · Salah ${n?100-pc:0}%</p>
+<button class="big g" onclick="adv()">${S.current_q==Q.length?'SELESAI':'SOAL BERIKUTNYA'}</button> <button class="r" onclick="if(confirm('Akhiri sesi?'))adv(1)">Akhiri</button></div>${S.show_lb?lbTable(LB.slice(0,5)):''}`)}
+
+/* ---------- SISWA ---------- */
+function studentJoin(){const pin=new URLSearchParams(location.search).get('pin')||'';
+  view(`<div class=card><h1>Gabung Permainan</h1><p><input id=pin placeholder="Game PIN" value="${esc(pin)}" inputmode=numeric maxlength=6></p><p><input id=nm placeholder="Nama lengkap" maxlength=30></p>
+<button class="big g" onclick="doJoin()">GABUNG PERMAINAN</button> <button onclick="home()">Kembali</button></div>`)}
+async function doJoin(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session||!session.user.is_anonymous){const r=await sb.auth.signInAnonymously();if(r.error)return alert(r.error.message)}
+  const p=await call('join_session',{p_pin:$('pin').value,p_name:$('nm').value});if(!p)return;me=p;
+  const {data:s}=await sb.from('sessions').select('*').eq('id',p.session_id).single();localStorage.gcs=s.id;enter(s,'student')}
+async function send(c){const k='a'+S.id+'_'+S.current_q;if(localStorage[k])return;localStorage[k]=c;lastK='';render();
+  const {error}=await sb.rpc('submit_answer',{p_sid:S.id,p_q:S.current_q,p_choice:c});if(error){localStorage.removeItem(k);alert(error.message);lastK='';render()}}
+function studentView(){
+  if(S.status=='lobby')return view(`<div class=card><h1>Halo, ${esc(me.name)}! 👋</h1><p>Menunggu guru memulai… (${P.length} peserta)</p><div class=shapes><span>🧊</span><span>⚽</span><span>🥫</span></div><div>${P.map(p=>`<span class=chip>${esc(p.name)}</span>`).join('')}</div></div>`);
+  const q=Q[S.current_q-1],a=ans(),l=left(),m=LB.find(x=>x.player_id==me.id);
+  view(`<div class=card><p>Soal ${S.current_q} dari ${Q.length} · ${tm()}</p><div style="font-size:4rem">${q.pic}</div><h2>${esc(q.body)}</h2>
+${a?'<h2>✅ Jawaban terkirim! Tunggu soal berikutnya…</h2>':l==0?'<h2>⏰ Waktu habis. Tunggu soal berikutnya…</h2>':`<div class=opts>${L.map((c,i)=>`<button class="opt ${['b','g','o','r'][i]}" onclick="send('${c}')">${c}. ${esc(q[c.toLowerCase()])}</button>`).join('')}</div>`}
+${S.show_lb&&m?`<p>Peringkatmu sementara: #${m.rank}</p>`:''}</div>`)}
+
+/* ---------- HASIL ---------- */
+function lbTable(r){return `<div class=card><table><tr><th>#</th><th>Nama</th><th>Skor</th><th>Nilai</th><th>Benar</th><th>Salah</th></tr>${r.map(x=>`<tr${me&&x.player_id==me.id?' style="background:#fff7d6"':''}><td>${x.rank}</td><td>${esc(x.name)}</td><td>${x.score}</td><td>${x.nilai}</td><td>${x.correct}</td><td>${x.wrong}</td></tr>`).join('')}</table></div>`}
+function finished(){const r=LB,m=me&&r.find(x=>x.player_id==me.id);
+  view(`<div class=card><h1>🎉 SELAMAT! PETUALANGAN BANGUN RUANG SELESAI!</h1>
+<div class=pod>${[1,0,2].map(i=>r[i]?`<div style="background:${['#ffd23f','#cfd8dc','#e0a15e'][i]};height:${[200,150,110][i]}px">${i==0?'👑':''}<br>${i+1}. ${esc(r[i].name)}<br>${r[i].score}/${Q.length}</div>`:'').join('')}</div>
+${m?`<div class=card style="background:#e8fff0"><h2>Peringkatmu: #${m.rank}</h2><p>Skor ${m.score} · Nilai ${m.nilai} · Benar ${m.correct} · Salah ${m.wrong}</p></div>`:''}
+${lbTable(r)}${role=='host'?'<button class="big b" onclick="csv()">UNDUH CSV</button> <button class="big g" onclick="dash()">Dashboard</button>':'<button class="big g" onclick="localStorage.removeItem(\'gcs\');home()">Selesai</button>'}</div>`);
+  if(conf!=S.id){conf=S.id;for(let i=0;i<60;i++){const d=document.createElement('i');d.className='cf';d.style.cssText=`left:${Math.random()*100}vw;background:hsl(${Math.random()*360},90%,60%);animation-delay:${Math.random()*1.5}s`;document.body.appendChild(d);setTimeout(()=>d.remove(),5000)}}}
+function csv(){const f=v=>'"'+String(/^[=+\-@]/.test(v)?"'"+v:v).replace(/"/g,'""')+'"';
+  const rows=[['Peringkat','Nama','Skor','Nilai','Benar','Salah','Waktu (detik)'],...LB.map(x=>[x.rank,x.name,x.score,x.nilai,x.correct,x.wrong,(x.total_ms/1000).toFixed(1)])];
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(f).join(',')).join('\n')],{type:'text/csv'}));a.download='hasil-'+S.pin+'.csv';a.click()}
+
+/* ---------- SINKRONISASI ---------- */
+async function enter(s,r){stop();S=s;role=r;lastK='';
+  if(!Q.length){const {data}=await sb.from('questions').select('*').order('q');Q=data}
+  ch=sb.channel('g'+s.id).on('postgres_changes',{event:'*',schema:'public'},()=>refresh()).subscribe();
+  t1=setInterval(refresh,3000);t2=setInterval(()=>{const e=$('tm');if(e){e.textContent='⏱ '+left();if(left()==0&&!e.dataset.z)render()}},500);await refresh()}
+async function refresh(){if(busy)return;busy=1;try{
+  const {data:s}=await sb.from('sessions').select('*').eq('id',S.id).maybeSingle();
+  if(!s){if(role=='student'){localStorage.removeItem('gcs');alert('Sesi tidak tersedia');home()}return}S=s;
+  const {data:p}=await sb.from('players').select('id,name').eq('session_id',S.id).order('joined_at');P=p||[];
+  if(role=='student'&&!P.find(x=>x.id==me.id)){localStorage.removeItem('gcs');alert('Kamu dikeluarkan dari sesi');return home()}
+  if(role=='host'&&S.status=='question'){const {data}=await sb.rpc('q_stats',{p_sid:S.id,p_q:S.current_q});ST=data||[]}
+  if(S.status=='finished'||S.show_lb){const {data}=await sb.rpc('leaderboard',{p_sid:S.id});LB=data||[]}
+  render()}finally{busy=0}}
+function render(){const k=JSON.stringify([S,P,ST,LB,S.q_started&&left()==0,S.q_started&&ans()]);if(k==lastK)return;lastK=k;
+  if(S.status=='finished')return finished();role=='host'?hostView():studentView()}
+init();
+</script></body></html>
